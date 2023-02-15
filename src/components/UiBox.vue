@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import eventBus from "../../lib/eventBus";
-import { cloneDeep } from "lodash-es";
+import { deepCopyObject } from "../../lib/utils";
 import { storyHandler } from "@/index";
 type IUiType = "live2d" | "currentStoryIndex";
 let uiType = ref<IUiType>("live2d");
@@ -14,7 +14,7 @@ const initTrans = {
   y: 0,
   scale: 1,
 };
-let backTrans = cloneDeep(initTrans);
+let backTrans = deepCopyObject(initTrans);
 let selectCache: { uiType: IUiType; current: string };
 if (localStorage.getItem(cacheKey)) {
   selectCache = JSON.parse(localStorage.getItem(cacheKey)!);
@@ -82,7 +82,7 @@ function emitL2dTransForm(e: MouseEvent) {
       break;
     case "还原":
       emitParams = backTrans;
-      backTrans = _.cloneDeep(initTrans);
+      backTrans = deepCopyObject(initTrans);
       break;
   }
   console.log("当前l2d移动情况", backTrans);

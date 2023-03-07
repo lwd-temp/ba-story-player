@@ -25,9 +25,12 @@ let l2dVoiceExcelTable = {
 export async function init(elementID: string, props: PlayerConfigs, endCallback: () => void) {
   //缓解图片缩放失真
   settings.MIPMAP_TEXTURES = 2
-
-  if (props.useMp3) {
+  const { useMp3, useSuperSampling } = props
+  if (useMp3) {
     utils.setOggAudioType('mp3')
+  }
+  if(useSuperSampling) {
+    utils.setSuperSample(4)
   }
   storyHandler.endCallback = endCallback
   playerStore = usePlayerStore()

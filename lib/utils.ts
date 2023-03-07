@@ -6,6 +6,10 @@ let otherSoundMap: OtherSoundsUrls
  * ogg类型的音频是否用其他音频类型代替
  */
 let oggAudioType = 'ogg'
+/**
+ * 开启超分
+ */
+let superSampling = ''
 
 /**
  * 设置数据站点
@@ -25,6 +29,13 @@ export function setDataUrl(url: string): void {
  */
 export function setOggAudioType(audioType: 'mp3') {
   oggAudioType = audioType
+}
+
+/**
+ * 设置超分大小
+ */
+export function setSuperSample(samplingType: 4) {
+  superSampling = `-${samplingType}x`
 }
 
 /**
@@ -53,8 +64,14 @@ export function getResourcesUrl(type: ResourcesTypes, arg: string): string {
     case 'l2dVoice':
       return `${dataUrl}/Audio/VoiceJp/${arg}.wav`
     case 'l2dSpine':
+      if(superSampling){
+        return `${dataUrl}/spine/${arg}/${arg}${superSampling}/${arg}.skel`
+      }
       return `${dataUrl}/spine/${arg}/${arg}.skel`
     case 'otherL2dSpine':
+      if(superSampling){
+        return `${dataUrl}/spine/${arg}/${arg}${superSampling}/${arg}.skel`
+      }
       return `${dataUrl}/spine/${arg}.skel`
     case 'excel':
       return `${dataUrl}/data/${arg}`
@@ -70,8 +87,19 @@ export function getResourcesUrl(type: ResourcesTypes, arg: string): string {
       let id = temp.pop()
       id = id?.replace('CharacterSpine_', '')
       let filename = `${id}_spr` //hasumi_spr
+      if(superSampling){
+        return `${dataUrl}/spine/${filename}/${filename}${superSampling}/${filename}.skel`
+      }
       return `${dataUrl}/spine/${filename}/${filename}.skel`
     case 'bg':
+      if(superSampling){
+        const temp = String(arg).split('/')
+        const fileName = temp.pop();
+        const dir = temp.slice(-1)
+        const superSamplingDir = `${dir}${superSampling}`
+        return `${dataUrl}/${temp.join('/')}/${superSamplingDir}/${fileName}.jpg`
+      }
+      // arg: UIs/03_Scenario/01_Background/SpineBG_LobbyHoshino
       return `${dataUrl}/${arg}.jpg`
     case 'otherSound':
       return Reflect.get(otherSoundMap, arg) || ''

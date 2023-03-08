@@ -144,33 +144,32 @@ let zmcPlayer = {
     }
     bgInstance.scale.set(1)
     bgInstance.anchor.set(0.5, 0.5)
-    //大小算法尚不明确, 先用一个魔法数代替
-    bgInstance.scale.set(args.size / bgInstance.width * (7 / 8) * this.bgInstanceOriginScale)
+    //大小算法尚不明确, 先用一个魔法数代替, size越大图片越小
+    const zmcScale = 2860 / args.size * this.bgInstanceOriginScale
+    bgInstance.scale.set(zmcScale)
 
     switch (args.type) {
       case 'instant':
         bgInstance.pivot = { x: 0, y: 0 }
-        bgInstance.pivot.x += args.position[0]
+        bgInstance.pivot.x += args.position[0] / zmcScale
         //y轴方向与pixi默认方向相反
-        bgInstance.pivot.y += -args.position[1]
+        bgInstance.pivot.y -= args.position[1] / zmcScale
         bgInstance.position.set(app.screen.width / 2, app.screen.height / 2)
-        console.log(bgInstance.scale.x)
         break
       case 'move':
         if (args.duration !== 10) {
           //不清楚具体如何作用, 经测试大概需要乘以原来缩放的1.5倍
           let positionProportion = this.bgInstanceOriginScale * 1.5
           await gsap.to(bgInstance, {
-            pixi: { x: `+=${args.position[0] * positionProportion}`, y: `+=${args.position[1] * positionProportion}` },
+            pixi: { pivotX: args.position[0] / zmcScale, pivotY: -args.position[1] / zmcScale, scale: zmcScale },
             duration: args.duration / 1000
           })
         }
         else {
           bgInstance.pivot = { x: 0, y: 0 }
-          bgInstance.pivot.x += args.position[0]
-          bgInstance.pivot.y += -args.position[1]
+          bgInstance.pivot.x += args.position[0] / zmcScale
+          bgInstance.pivot.y -= args.position[1] / zmcScale
           bgInstance.position.set(app.screen.width / 2, app.screen.height / 2)
-          console.log(bgInstance.scale.x)
         }
     }
   },
@@ -189,8 +188,8 @@ let zmcPlayer = {
         && this.bgInstanceOriginScale !== Default_Scale
         && bgInstance.scale.x !== this.bgInstanceOriginScale) {
         bgInstance.scale.set(this.bgInstanceOriginScale)
-        bgInstance.pivot.set(0, 0)
-        bgInstance.position = this.bgInstanceOriginPosition
+        // bgInstance.pivot.set(0, 0)
+        // bgInstance.position = this.bgInstanceOriginPosition
         this.bgInstanceOriginScale = Default_Scale
         this.onZmc = false
       }

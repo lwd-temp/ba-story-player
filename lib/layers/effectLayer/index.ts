@@ -188,7 +188,7 @@ let zmcPlayer = {
         && this.bgInstanceOriginScale !== Default_Scale
         && bgInstance.scale.x !== this.bgInstanceOriginScale) {
         bgInstance.scale.set(this.bgInstanceOriginScale)
-        // bgInstance.pivot.set(0, 0)
+        bgInstance.pivot.set(0, 0)
         // bgInstance.position = this.bgInstanceOriginPosition
         this.bgInstanceOriginScale = Default_Scale
         this.onZmc = false

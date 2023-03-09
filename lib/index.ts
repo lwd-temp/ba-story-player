@@ -9,9 +9,10 @@ import { PlayerConfigs, StoryUnit } from "@/types/common";
 import * as utils from '@/utils';
 import { getOtherSoundUrls, wait } from "@/utils";
 import axios from 'axios';
-import { SpineParser } from 'pixi-spine';
+import { SpineParser, IEventData } from 'pixi-spine';
 import { Application, Loader, settings, utils as pixiUtils } from "pixi.js";
 import { L2DInit } from "./layers/l2dLayer/L2D";
+import * as process from "process";
 
 let playerStore: ReturnType<typeof usePlayerStore>
 let privateState: ReturnType<typeof initPrivateState>
@@ -47,6 +48,7 @@ export async function init(elementID: string, props: PlayerConfigs, endCallback:
   // TODO debug用 线上环境删掉 而且会导致HMR出问题 慎用
   // https://chrome.google.com/webstore/detail/pixijs-devtools/aamddddknhcagpehecnhphigffljadon/related?hl=en
   // (window as any).__PIXI_INSPECTOR_GLOBAL_HOOK__ && (window as any).__PIXI_INSPECTOR_GLOBAL_HOOK__.register({ PIXI: PIXI })
+  // globalThis.__PIXI_APP__ = privateState.app;
 
   let app = playerStore.app
   document.querySelector(`#${elementID}`)?.appendChild(app.view)
@@ -60,12 +62,6 @@ export async function init(elementID: string, props: PlayerConfigs, endCallback:
     console.error(err);
     eventBus.emit("oneResourceLoaded", { type: "fail", resourceName: resource.name });
   });
-  // 记录加载开始时间 优化光速加载的体验
-  let startLoadTime = 0;
-  app.loader.onStart.add(() => {
-    startLoadTime = Date.now();
-    eventBus.emit("startLoading", props.dataUrl);
-  });
   //加载初始化资源以便翻译层进行翻译
   await resourcesLoader.init(app.loader)
   privateState.allStoryUnit = translate(props.story)
@@ -76,6 +72,9 @@ export async function init(elementID: string, props: PlayerConfigs, endCallback:
   effectInit()
   L2DInit()
 
+  // 记录加载开始时间 优化光速加载的体验
+  const startLoadTime = Date.now();
+  eventBus.emit("startLoading", props.dataUrl);
   //加载剩余资源
   await resourcesLoader.addLoadResources()
   resourcesLoader.load(() => {
@@ -294,8 +293,6 @@ export let storyHandler = {
 export let eventEmitter = {
   /** 当前是否处于l2d播放中, 并不特指l2d某个动画 */
   l2dPlaying: false,
-  voiceIndex: 1,
-  playL2dVoice: true,
   characterDone: true,
   effectDone: true,
   titleDone: true,
@@ -328,8 +325,6 @@ export let eventEmitter = {
       }
     }
     this.l2dPlaying = false
-    this.playL2dVoice = true
-    this.voiceIndex = 1
     eventBus.on('next', () => {
       storyHandler.next()
       if (!this.unitDone) {
@@ -368,8 +363,11 @@ export let eventEmitter = {
     eventBus.on('toBeContinueDone', () => this.toBeContinueDone = true)
 
     storyHandler.currentStoryIndex = 0
+    if (import.meta.env.DEV) {
+      storyHandler.currentStoryIndex = Number(localStorage.getItem("storyIndex") || 0)
+    }
     storyHandler.isEnd = false
-    storyHandler.storyPlay()
+    storyHandler.storyPlay().then();
   },
 
   /**
@@ -428,14 +426,6 @@ export let eventEmitter = {
             })
           }
         }
-        if (this.l2dPlaying && this.playL2dVoice) {
-          //to do 后续加入声音对应表
-          //判断并播放l2d语音, 根据clearST增加语音的下标
-          eventBus.emit('playAudio', {
-            voiceJPUrl: `${playerStore.dataUrl}/Audio/VoiceJp/CH0184_MemorialLobby/${this.voiceIndex}.wav`
-          })
-          this.playL2dVoice = false
-        }
         break
       case 'effectOnly':
         break
@@ -486,10 +476,6 @@ export let eventEmitter = {
     if (storyHandler.currentStoryUnit.textAbout.st) {
       if (storyHandler.currentStoryUnit.textAbout.st.clearSt) {
         eventBus.emit('clearSt')
-        if (this.l2dPlaying) {
-          this.voiceIndex++
-          this.playL2dVoice = true
-        }
       }
     }
   },
@@ -548,7 +534,6 @@ export let eventEmitter = {
   playL2d() {
     if (storyHandler.currentStoryUnit.l2d) {
       if (storyHandler.currentStoryUnit.l2d.animationName === 'Idle_01') {
-        playerStore.setL2DSpineUrl(storyHandler.currentStoryUnit.l2d.spineUrl)
         eventBus.emit('playL2D')
         this.l2dPlaying = true
       }
@@ -607,13 +592,13 @@ export let eventEmitter = {
 
   async transitionIn() {
     if (storyHandler.currentStoryUnit.transition) {
-      eventBus.emit('transitionIn', storyHandler.currentStoryUnit.transition)
       await new Promise<void>(resolve => {
-        let resolveFun = () => {
-          eventBus.off('transitionInDone', resolveFun)
+        function complete() {
+          eventBus.off('transitionInDone', complete);
           resolve()
         }
-        eventBus.on('transitionInDone', resolveFun)
+        eventBus.on('transitionInDone', complete);
+        eventBus.emit('transitionIn', storyHandler.currentStoryUnit.transition!);
       })
     }
   },
@@ -621,13 +606,13 @@ export let eventEmitter = {
   async transitionOut() {
     if (storyHandler.currentStoryUnit.transition) {
       if (storyHandler.currentStoryUnit.transition) {
-        eventBus.emit('transitionOut', storyHandler.currentStoryUnit.transition)
         await new Promise<void>(resolve => {
           let resolveFun = () => {
-            eventBus.off('transitionOutDone', resolveFun)
+            eventBus.off('transitionOutDone', resolveFun);
             resolve()
           }
-          eventBus.on('transitionOutDone', resolveFun)
+          eventBus.on('transitionOutDone', resolveFun);
+          eventBus.emit('transitionOut', storyHandler.currentStoryUnit.transition!);
         })
       }
     }
@@ -676,7 +661,7 @@ export let resourcesLoader = {
       //添加人物spine
       if (unit.characters.length != 0) {
         for (let character of unit.characters) {
-          let spineUrl = character.spineUrl
+          const spineUrl = character.spineUrl
           if (!this.loader.resources[character.CharacterName]) {
             this.loader.add(String(character.CharacterName), spineUrl)
           }
@@ -707,7 +692,8 @@ export let resourcesLoader = {
       //添加l2d spine资源
       this.checkAndAdd(unit.l2d, 'spineUrl')
       if (unit.l2d) {
-        playerStore.curL2dConfig?.otherSpine.forEach(i => this.checkAndAdd(utils.getResourcesUrl('otherL2dSpine', i)))
+        playerStore.curL2dConfig?.otherSpine?.forEach(i => this.checkAndAdd(utils.getResourcesUrl('otherL2dSpine', i)))
+        playerStore.setL2DSpineUrl(unit.l2d.spineUrl)
       }
     }
     await preloadSound(audioUrls)
@@ -721,13 +707,18 @@ export let resourcesLoader = {
     let hasLoad = false
     this.loader.onError.add((error) => { throw error })
     this.loader.load((loader, res) => {
-      playerStore.app.loader.load((loader, res) => {
+      playerStore.app.loader.load(async (loader, res) => {
         //当chrome webgl inspector打开时可能导致callback被执行两次
         if (!hasLoad) {
           console.log('已加载资源:', res)
-          callback()
           hasLoad = true
+          const spineData = usePlayerStore().l2dSpineData
+          if (spineData) {
+            await this.loadL2dVoice(spineData.events)
+          }
+          callback()
         }
+
       })
     })
   },
@@ -787,12 +778,19 @@ export let resourcesLoader = {
   /**
    * 添加l2d语音
    */
-  addL2dVoice(name: string) {
-    let voicePath = `${name}_MemorialLobby`
-    for (let voiceFileName of l2dVoiceExcelTable[voicePath]) {
-      this.loader.add(voiceFileName, `${voicePath}/${voiceFileName}`
-      )
+  loadL2dVoice(audioEvents: IEventData[]) {
+    for (let event of audioEvents) {
+      if (event.name.includes('MemorialLobby')) {
+        const voiceUrl = utils.getResourcesUrl('l2dVoice', event.name)
+        this.loader.add(voiceUrl, voiceUrl)
+      }
     }
+
+    return new Promise<void>(resolve => {
+      this.loader.load(() => {
+        resolve()
+      })
+    })
   },
 
   /**
@@ -857,6 +855,13 @@ export let resourcesLoader = {
       axios.get(utils.getResourcesUrl('excel', 'ScenarioBGEffectExcelTable.json')).then(res => {
         for (let i of res.data['DataList']) {
           privateState.BGEffectExcelTable.set(i['Name'], i)
+        }
+      })
+    )
+    excelPromiseArray.push(
+      axios.get(utils.getResourcesUrl('excel', 'ScenarioCharacterEmotionExcelTable.json')).then(res => {
+        for (let i of res.data['DataList']) {
+          privateState.EmotionExcelTable.set(i['Name'], i['EmoticonName'])
         }
       })
     )

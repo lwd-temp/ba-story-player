@@ -3,7 +3,7 @@ import { usePlayerStore } from "@/stores";
 import {
   CharacterEffectInstance, CharacterEmotionPlayer, EmotionOptions, EmotionWord, PositionOffset, Scale
 } from "@/types/characterLayer";
-import gsap from 'gsap';
+import gsap, { Power4 } from 'gsap';
 import { Spine } from "pixi-spine";
 import { Container, Sprite } from "pixi.js";
 import emotionOptions from "./options/emotionOptions";
@@ -151,21 +151,17 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
     const note = sprites[0];
     const scale = getRelativeScale(note, options)
     const { container } = prepareEmotionContainer(instance.instance, options);
-
     note.scale.set(scale * 0.7);
-    const x = instance.instance.width * options.startPositionOffset.x;
-    const y = instance.instance.width * options.startPositionOffset.y;
     note.visible = true;
-    note.position.set(x, y);
     container.addChild(note);
     const tl = gsap.timeline();
     tl.to(note.scale, { x: scale, y: scale, duration: 0.1 })
-      .to(note, { x: x + note.width * options.animation.offset.x, duration: options.animation.duration })
+      .to(note, { x: note.width * options.animation.offset.x, duration: options.animation.duration })
       .add('start', '<')
-      .to(note, { y: y + note.width * options.animation.offset.y, angle: options.rotateAngle, duration: options.animation.duration * 0.3 }, 'start')
-      .to(note, { y: y, angle: 0, duration: options.animation.duration * 0.3 }, '>')
-      .to(note, { y: y + note.width * options.animation.offset.y, angle: options.rotateAngle, duration: options.animation.duration * 0.4 }, '>')
-      .to(note, { y: y, angle: 0, duration: options.animation.duration * 0.4 }, '>')
+      .to(note, { y: note.width * options.animation.offset.y, angle: options.rotateAngle, duration: options.animation.duration * 0.3 }, 'start')
+      .to(note, { y: 0, angle: 0, duration: options.animation.duration * 0.3 }, '>')
+      .to(note, { y: note.width * options.animation.offset.y, angle: options.rotateAngle, duration: options.animation.duration * 0.4 }, '>')
+      .to(note, { y: 0, angle: 0, duration: options.animation.duration * 0.4 }, '>')
       .to(note, { alpha: 0, duration: options.fadeOutDuration }, '>')
 
 
@@ -200,7 +196,7 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
         options.perImgSetting[i].anchor.x,
         options.perImgSetting[i].anchor.y,
       )
-      respondImg.scale.set(scale * options.perImgSetting[i].scale / spine.scale.x)
+      respondImg.scale.set(scale * options.perImgSetting[i].scale / 0.5)
       container.addChild(respondImg)
     }
     container.zIndex = 10
@@ -216,17 +212,29 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
     );
   }, Sad(instance: CharacterEffectInstance, options: EmotionOptions['Sad'], sprites: Sprite[]): Promise<void> {
     const { container } = prepareEmotionContainer(instance.instance, options);
-    // TODO
-    return Promise.resolve(undefined);
+    const tl = gsap.timeline()
+    const sadLineImages: Sprite[] = []
+    for (let i = 0; i < 3; ++i) {
+      const sadLineImage = Sprite.from(sprites[0].texture)
+      sadLineImages.push(sadLineImage)
+      sadLineImage.alpha = 0
+      sadLineImage.scale.y = 0.5
+      sadLineImage.position.x = options.imageGap * i
+      sadLineImage.position.y = options.imgInitYPosition[i]
+      container.addChild(sadLineImage)
+      tl.to(sadLineImage, { pixi: { alpha: 1 }, duration: 1 / 15 }, i / 6)
+        .to(sadLineImage, { pixi: { scaleY: 1 }, duration: 4 / 15 }, '>')
+        .to(sadLineImage, { pixi: { positionY: `+=${options.moveYDistance}` } }, '<')
+        .to(sadLineImage, { duration: 26 / 60 }, '>')
+    }
+    tl.to(container, { pixi: { alpha: 0 }, duration: 8 / 60 })
+
+    return timelinePromise(tl, sadLineImages)
   }, Shy(instance: CharacterEffectInstance, options: EmotionOptions['Shy'], sprites: Sprite[]): Promise<void> {
     const dialogImg = sprites[0]
     const shyImg = sprites[1]
-    const { container, offsetX, offsetY } = prepareEmotionContainer(instance.instance, options);
+    const { container } = prepareEmotionContainer(instance.instance, options);
     const scale = getRelativeScale(dialogImg, options)
-    container.position.set(
-      offsetX + instance.instance.width * options.startPositionOffset.x,
-      offsetY + instance.instance.width * options.startPositionOffset.y
-    );
     dialogImg.scale.set(scale * options.scaleAnamation.startScale)
     dialogImg.anchor.set(options.scaleAnamation.anchor.x, options.scaleAnamation.anchor.y)
     const shyImgPos = calcRelativePosition(dialogImg, options.shyImg.position)
@@ -288,8 +296,6 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
     const scale = getRelativeScale(dropImg, options)
     dropImg.scale.set(scale);
     smallDropImg.scale.set(scale);
-    dropImg.x = instance.instance.width * options.startPositionOffset.x;
-    dropImg.y = instance.instance.width * options.startPositionOffset.y;
     const smallPosition = calcRelativePosition(dropImg, options.smallImg.offset);
     smallDropImg.x = smallPosition.x;
     smallDropImg.y = smallPosition.y;
@@ -308,7 +314,7 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
   }, Twinkle(instance: CharacterEffectInstance, options: EmotionOptions['Twinkle'], sprites: Sprite[]): Promise<void> {
     const { container } = prepareEmotionContainer(instance.instance, options);
 
-    const scale = getRelativeScale(sprites[0], options) / instance.instance.scale.x;
+    const scale = getRelativeScale(sprites[0], options) / 0.5;
     const starImgs: Sprite[] = []
     const starImgScales: number[] = []
     for (let i = 0; i < 3; ++i) {
@@ -371,6 +377,105 @@ const CharacterEmotionPlayerInstance: CharacterEmotionPlayer = {
         .to(dialogImg, { pixi: { alpha: 0 }, duration: options.fadeOutDuration })
       , [upsetImg]
     )
+  }, Steam(instance, options, sprites) {
+    const { container } = prepareEmotionContainer(instance.instance, options)
+    const steamImage1 = Sprite.from(sprites[0].texture)
+    steamImage1.angle = options.imgAngles[0]
+    steamImage1.anchor.set(options.imgPivot.x, options.imgPivot.y)
+    steamImage1.scale.set(options.imgScaleAnimation[0].start)
+
+    const steamImage2 = Sprite.from(sprites[0].texture)
+    steamImage2.angle = options.imgAngles[1]
+    steamImage2.anchor.set(options.imgPivot.x, options.imgPivot.y)
+    steamImage2.scale.set(options.imgScaleAnimation[1].start)
+    steamImage2.visible = false
+    container.addChild(steamImage2)
+    container.addChild(steamImage1)
+
+    const tl = gsap.timeline()
+    tl.to(steamImage1, { pixi: { scale: options.imgScaleAnimation[0].end }, duration: 14 / 60 })
+      .addLabel('image2Start')
+      .to(steamImage1, { pixi: { alpha: 0 }, duration: 12 / 60 })
+      .to(steamImage2, {
+        pixi: { scale: options.imgScaleAnimation[1].end },
+        duration: 21 / 60,
+        onStart() {
+          steamImage2.visible = true
+        }
+      }, 'image2Start')
+      .to(steamImage2, { pixi: { alpha: 0 }, duration: 8 / 60 }, '>')
+
+    return timelinePromise(tl, [steamImage1, steamImage2])
+  }, Sigh(instance, options, sprites) {
+    const { container } = prepareEmotionContainer(instance.instance, options)
+    const sighImage = Sprite.from(sprites[0].texture)
+    sighImage.alpha = 0
+    sighImage.angle = options.angle
+    sighImage.anchor.set(options.anchor.x, options.anchor.y)
+    sighImage.scale.set(options.scaleAnimation.start)
+    container.addChild(sighImage)
+
+    const tl = gsap.timeline()
+    tl.to(sighImage, { pixi: { alpha: 1 }, duration: 2 / 60 })
+      .to(sighImage, { pixi: { scale: options.scaleAnimation.end }, ease: Power4.easeOut, duration: 33 / 60 })
+      .to(sighImage, { pixi: { alpha: 0 }, duration: 11 / 60 }, `>+=${12 / 60}`)
+
+    return timelinePromise(tl, [sighImage])
+  }, Bulb(instance, options, sprites) {
+    const dialogImg = Sprite.from(sprites[0].texture)
+    const { container } = prepareEmotionContainer(instance.instance, options, dialogImg)
+    container.alpha = 0
+
+    const bulbImage = Sprite.from(sprites[1].texture)
+    bulbImage.anchor.set(0.5, 0.5)
+    bulbImage.position.set(dialogImg.width / 2, options.bulbYPosition)
+    bulbImage.visible = false
+    container.addChild(bulbImage)
+
+    const lightImage = Sprite.from(sprites[2].texture)
+    lightImage.anchor.set(0.5, 0.5)
+    lightImage.position.set(dialogImg.width / 2, options.lightYPosition)
+    lightImage.scale.set(options.lightScale)
+    lightImage.visible = false
+    container.addChild(lightImage)
+
+    const tl = gsap.timeline()
+    tl.to(container, { pixi: { alpha: 1 }, duration: 6 / 60 })
+      .to(container, { onStart() { bulbImage.visible = lightImage.visible = true }, duration: 6 / 60 })
+      .to(container, { onStart() { bulbImage.visible = true, lightImage.visible = false }, duration: 7 / 60 })
+      .to(container, {
+        onStart() { bulbImage.visible = lightImage.visible = true }, duration: 52 / 60, onComplete() {
+          container.visible = false
+        }
+      })
+
+    return timelinePromise(tl, [bulbImage, lightImage])
+  }, Tear(instance, options, sprites) {
+    const { container } = prepareEmotionContainer(instance.instance, options)
+
+    const largeTearImage = Sprite.from(sprites[0].texture)
+    largeTearImage.position = options.positions[0]
+    largeTearImage.anchor.set(options.anchors[0].x, options.anchors[0].y)
+    largeTearImage.scale.set(options.scaleAnimations[0].start)
+    container.addChild(largeTearImage)
+    largeTearImage.alpha = 0
+
+    const smallTearImage = Sprite.from(sprites[1].texture)
+    smallTearImage.position = options.positions[1]
+    smallTearImage.anchor.set(options.anchors[1].x, options.anchors[1].y)
+    smallTearImage.scale.set(options.scaleAnimations[1].start)
+    container.addChild(smallTearImage)
+    smallTearImage.alpha = 0
+
+    const tl = gsap.timeline()
+    tl.to(smallTearImage, { pixi: { alpha: 1 }, duration: 7 / 60 })
+      .to(smallTearImage, { pixi: { scale: options.scaleAnimations[0].end }, ease: Power4.easeOut, duration: 12 / 60 })
+      .to(smallTearImage, { pixi: { alpha: 0 }, duration: 15 / 60 }, `>+=${13 / 60}`)
+      .to(largeTearImage, { pixi: { alpha: 1 }, duration: 3 / 60 }, 12 / 60)
+      .to(largeTearImage, { pixi: { scale: options.scaleAnimations[1].end }, ease: Power4.easeOut, duration: 13 / 60 }, '<')
+      .to(largeTearImage, { pixi: { alpha: 0 }, ease: Power4.easeOut, duration: 4 / 60 }, `>+=${32 / 60}`)
+
+    return timelinePromise(tl, [smallTearImage, largeTearImage])
   }
 }
 
@@ -440,7 +545,6 @@ function prepareEmotionContainer(spine: Spine, options: EmotionOptions[EmotionWo
  * @returns 缩放比例绝对值
  */
 function getRelativeScale(img: Sprite, options: EmotionOptions[EmotionWord]) {
-  //用播放器宽度的1/5作为图片缩放的基准
   return options.scale * 540 / img.width
 }
 

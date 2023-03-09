@@ -1,35 +1,10 @@
 import { usePlayerStore } from '@/stores';
-import { EmotionWord } from "@/types/characterLayer";
 import { StoryRawUnit, StoryUnit, ZmcArgs } from "@/types/common";
 import { StArgs } from '@/types/events';
 import { getResourcesUrl } from '@/utils';
 import { l2dConfig } from '../l2dLayer/l2dConfig';
 import * as utils from "./utils";
-
-let emotionWordTable: { [index: string]: EmotionWord } = {
-  '[하트]': 'Heart',
-  'h': 'Heart',
-  '[반응]': 'Respond',
-  '[재잘]': 'Respond',
-  '[음표]': 'Music',
-  'm': 'Music',
-  '[반짝]': 'Twinkle',
-  'k': 'Twinkle',
-  '[속상함]': 'Sad',
-  'u': 'Sad',
-  '[땀]': 'Sweat',
-  'w': 'Sweat',
-  '[...]': 'Dot',
-  '…': 'Dot',
-  'c': 'Chat',
-  '[!]': 'Exclaim',
-  '[빠직]': 'Angry',
-  '[?!]': 'Surprise',
-  '?!': 'Surprise',
-  '[?]': 'Question',
-  '[///]': 'Shy'
-  // TODO: Upset, Music, Think, Bulb, Sigh, Steam, Zzz, Tear
-}
+import {getText} from "./utils";
 
 /**
  * 将原始剧情结构翻译成标准剧情结构
@@ -99,7 +74,6 @@ export function translate(rawStory: StoryRawUnit[]): StoryUnit[] {
     if (rawStoryUnit.TextJp === '' || rawStoryUnit.TextJp === null) {
       unit.type = 'effectOnly'
     }
-
     //解析scriptkr
     let ScriptKr = String(rawStoryUnit.ScriptKr)
     let scripts = ScriptKr.split('\n')
@@ -255,15 +229,18 @@ export function translate(rawStory: StoryRawUnit[]): StoryUnit[] {
               })
             }
             else if (utils.compareCaseInsensive(scriptUnits[1], 'em')) {
-              if (emotionWordTable[scriptUnits[2]] === undefined) {
-                console.log(`${scriptUnits[2]}未收录到emotionWordTable中, 当前rawStoryUnit: `, rawStoryUnit)
+              const emotionName = utils.getEmotionName(scriptUnits[2])
+              if (!emotionName) {
+                console.error(`查询不到${scriptUnits[2]}的emotionName中, 当前rawStoryUnit: `, rawStoryUnit)
               }
-              let characterIndex = utils.getCharacterIndex(unit, Number(scriptType[1]), result, rawIndex)
-              unit.characters[characterIndex].effects.push({
-                type: 'emotion',
-                effect: emotionWordTable[scriptUnits[2]],
-                async: false
-              })
+              else {
+                const characterIndex = utils.getCharacterIndex(unit, Number(scriptType[1]), result, rawIndex)
+                unit.characters[characterIndex].effects.push({
+                  type: 'emotion',
+                  effect: emotionName,
+                  async: false
+                })
+              }
             }
             else if (utils.compareCaseInsensive(scriptUnits[1], 'fx')) {
               let characterIndex = utils.getCharacterIndex(unit, Number(scriptType[1]), result, rawIndex)
@@ -276,41 +253,23 @@ export function translate(rawStory: StoryRawUnit[]): StoryUnit[] {
           }
           else if (utils.isOption(scriptType)) {
             unit.type = 'option'
-            let text = String(Reflect.get(rawStoryUnit, `Text${playerStore.language}`)).split('\n')[optionIndex]
-
-            //[s]
-            if (scriptType[2] === ']') {
-              text = text.slice(3)
-              if (unit.textAbout.options) {
-                unit.textAbout.options.push({ SelectionGroup: 0, text })
-              }
-              else {
-                unit.textAbout.options = [{ SelectionGroup: 0, text }]
-              }
+            const rawText = String(getText(rawStoryUnit, playerStore.language)).split('\n')[optionIndex]
+            const parseResult = /\[n?s(\d{0,2})?](.+)/.exec(rawText);
+            if (!parseResult) {
+              console.error("在处理选项文本时遇到严重错误");
+              break;
             }
-            //[ns]
-            else if (scriptType[2] === 's') {
-              text = text.slice(4)
-              if (unit.textAbout.options) {
-                unit.textAbout.options.push({ SelectionGroup: 0, text })
-              }
-              else {
-                unit.textAbout.options = [{ SelectionGroup: 0, text }]
-              }
+            const text = utils.splitStScriptAndParseTag(parseResult[2]);
+            const selectGroup = Number(parseResult[1] || 0)
+            if (unit.textAbout.options) {
+              unit.textAbout.options.push({ SelectionGroup: selectGroup, text })
             }
-            //[s1]
             else {
-              text = text.slice(4)
-              if (unit.textAbout.options) {
-                unit.textAbout.options.push({ SelectionGroup: Number(scriptType[2]), text })
-              }
-              else {
-                unit.textAbout.options = [{ SelectionGroup: Number(scriptType[2]), text }]
-              }
+              unit.textAbout.options = [{ SelectionGroup: selectGroup, text }]
             }
-            optionIndex++
+            optionIndex++;
           }
-          break
+          break;
       }
     }
     //没人highlight则默认所有人highlight

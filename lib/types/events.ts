@@ -272,7 +272,7 @@ export interface ShowOption {
   /**
    * 选项文本
    */
-  text: string
+  text: Text[]
 }
 
 export interface PlayEffect {
@@ -281,7 +281,7 @@ export interface PlayEffect {
 }
 
 export interface ShowTitleOption {
-  title: string;
+  title: Text[];
   subtitle?: string;
 }
 

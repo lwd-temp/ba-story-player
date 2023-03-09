@@ -90,12 +90,12 @@ export function getResourcesUrl(type: ResourcesTypes, arg: string): string {
       let id = temp.pop()
       id = id?.replace('CharacterSpine_', '')
       let filename = `${id}_spr` //hasumi_spr
-      if(superSampling){
+      if(superSampling && false){
         return `${dataUrl}/spine/${filename}/${filename}${superSampling}/${filename}.skel`
       }
       return `${dataUrl}/spine/${filename}/${filename}.skel`
     case 'bg':
-      if(superSampling){
+      if(superSampling && false){
         const temp = String(arg).split('/')
         const fileName = temp.pop();
         const dir = temp.slice(-1)
